@@ -7,10 +7,19 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
 <a href="https://chaitanyakumars2403.github.io/PopCorn/" target="_blank">
-        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/PopCorn/popcorn_poster.png">
+        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/PopCorn/popcorn_poster.png" alt="PopCorn Banner">
 </a>
 
 **PopCorn** is a modern, client-side web application designed for streaming local media files (videos and audio) directly in the browser. It combines a clean, aesthetic "glassmorphism" user interface with the powerful **Plyr** library to provide a seamless and feature-rich playback experience for your personal media library.
+
+Developed by **Chaitanya Kumar Sathivada**
+
+<a href="https://github.com/ChaitanyaKumarS2403">
+  <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/github_profile.png" alt="GitHub" height=50>
+</a>
+<a href="https://www.linkedin.com/in/chaitanya-kumar-sathivada/">
+  <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/linkedin_profile.png" alt="LinkedIn" height=50>
+</a>
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%">
@@ -21,7 +30,7 @@
 Access the latest stable version of PopCorn directly on your browser. Click on the button below to access the site:
 
 <a href="https://chaitanyakumars2403.github.io/PopCorn/" target="_blank">
-        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/VisitNow.png" height=50>
+        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/VisitNow.png" alt="Visit Now" height=50>
 </a>
 
 ~No installations required.
@@ -41,7 +50,7 @@ Access the latest stable version of PopCorn directly on your browser. Click on t
 Click on the button below to download the ***FFmpeg Wrapper*** Tool for Windows:
 
 <a href="https://github.com/ChaitanyaKumarS2403/ffmpeg-wrapper/releases/download/v1.0.0.0/FFmpeg.Wrapper.exe">
-        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/DownloadNow.png" height=50>
+        <img src="https://github.com/ChaitanyaKumarS2403/assets/raw/main/projects_repo/Misc/DownloadNow.png" alt="Download Now" height=50>
 </a>
 
 ## 📜 License
