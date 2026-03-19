@@ -8,14 +8,18 @@
 
 **PopCorn** is a modern, client-side web application designed for streaming local media files (videos and audio) directly in the browser. It combines a clean, aesthetic "glassmorphism" user interface with the powerful **Plyr** library to provide a seamless and feature-rich playback experience for your personal media library.
 
+<a href="https://chaitanyakumars2403.github.io/PopCorn/">
+        <img src="https://github.com/ChaitanyaKumarS2403/assets/blob/main/projects_repo/PopCorn/popcorn_poster.png">
+</a>
+
 ---
 
 ### 🌐 Live Access
 
-Access the latest stable version of PopCorn directly on GitHub Pages:
-[PopCorn Official Site](https://chaitanyakumars2403.github.io/PopCorn/)
-<a href="https://chaitanyakumars2403.github.io/PopCorn/">
-        <img src="https://github.com/ChaitanyaKumarS2403/assets/blob/main/projects_repo/PopCorn/popcorn_poster.png">
+Access the latest stable version of PopCorn directly on GitHub Pages. Click on the button below to access the site:
+
+<a href="https://chaitanyakumars2403.github.io/PopCorn/" target="_blank">
+        <img src="https://github.com/ChaitanyaKumarS2403/assets/blob/main/projects_repo/Misc/VisitNow.png" height=50>
 </a>
 
 ---
