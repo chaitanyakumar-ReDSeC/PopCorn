@@ -22,7 +22,7 @@ Developed by **Chaitanya Kumar Sathivada**
 </a>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" width="100%">
+  <img src="https://github.com/chaitanyakumar-ReDSeC/assets/raw/main/general/image_assets/rainbow.png" width="100%">
 </p>
 
 ### 🌐 Live Access
