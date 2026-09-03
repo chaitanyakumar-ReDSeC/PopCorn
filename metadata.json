@@ -1,0 +1,6 @@
+{
+  "name": "PopCorn",
+  "description": "PopCorn media streaming app with local file browsing, URL streamer, Video.js player, and dynamic audio & subtitle track extraction.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
