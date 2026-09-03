@@ -18,12 +18,13 @@ import {
   Check
 } from 'lucide-react';
 import { PlaybackSpeed, AudioTrack, SubtitleTrack } from '../types';
-
-interface SubCue {
-  start: number;
-  end: number;
-  text: string;
-}
+import {
+  loadSubtitleAsBlobUrl,
+  revokeVttBlobUrl,
+  parseTimeToSeconds,
+  formatVttTime,
+  SubCue,
+} from '../utils/subtitleLoader';
 
 interface VideoPlayerProps {
   src: string;
@@ -36,85 +37,6 @@ interface VideoPlayerProps {
   activeAudioTrack?: AudioTrack;
   onPlaybackStateChange?: (isPlaying: boolean) => void;
   onTracksExtracted?: (extractedAudio?: AudioTrack[], extractedSubs?: SubtitleTrack[]) => void;
-}
-
-function parseTimeToSeconds(timeStr: string): number {
-  if (!timeStr) return 0;
-  const cleaned = timeStr.trim();
-  const matchHms = cleaned.match(/^(\d+):(\d{2}):(\d{2})(?:[.,](\d+))?/);
-  if (matchHms) {
-    const h = parseInt(matchHms[1], 10);
-    const m = parseInt(matchHms[2], 10);
-    const s = parseInt(matchHms[3], 10);
-    const msStr = matchHms[4] || '0';
-    const ms = parseInt(msStr.padEnd(3, '0').substring(0, 3), 10);
-    return h * 3600 + m * 60 + s + ms / 1000;
-  }
-  const matchMs = cleaned.match(/^(\d{2}):(\d{2})(?:[.,](\d+))?/);
-  if (matchMs) {
-    const m = parseInt(matchMs[1], 10);
-    const s = parseInt(matchMs[2], 10);
-    const msStr = matchMs[3] || '0';
-    const ms = parseInt(msStr.padEnd(3, '0').substring(0, 3), 10);
-    return m * 60 + s + ms / 1000;
-  }
-  return 0;
-}
-
-function parseSubtitleContentToCues(text: string): SubCue[] {
-  const cues: SubCue[] = [];
-  if (!text) return cues;
-
-  // Clean UTF-8 BOM, carriage returns, and extra whitespace
-  const cleanText = text
-    .replace(/^\uFEFF/, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n');
-  const blocks = cleanText.split(/\n\s*\n/);
-
-  for (const block of blocks) {
-    const lines = block.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('-->')) {
-        const parts = lines[i].split('-->');
-        if (parts.length >= 2) {
-          const start = parseTimeToSeconds(parts[0]);
-          const end = parseTimeToSeconds(parts[1]);
-          const rawTextLines = lines.slice(i + 1);
-          const cueText = rawTextLines
-            .join('\n')
-            .replace(/<[^>]*>/g, '') // remove HTML tags if any
-            .trim();
-
-          if (cueText && end > start) {
-            cues.push({ start, end, text: cueText });
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  cues.sort((a, b) => a.start - b.start);
-  return cues;
-}
-
-function formatVttTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-}
-
-function buildVttDataUrl(cues: SubCue[]): string {
-  let vtt = "WEBVTT\n\n";
-  cues.forEach((c, idx) => {
-    const startStr = formatVttTime(c.start);
-    const endStr = formatVttTime(c.end);
-    vtt += `${idx + 1}\n${startStr} --> ${endStr}\n${c.text}\n\n`;
-  });
-  return "data:text/vtt;charset=utf-8," + encodeURIComponent(vtt);
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -325,10 +247,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => clearTimeout(toastTimer);
   }, [activeAudioTrack]);
 
-  // Subtitle Loader & WebVTT Generator
+  // Subtitle Loader & WebVTT Generator with CORS Proxy Fallback & Blob URLs
   useEffect(() => {
     if (!subtitlesEnabled || !activeSubtitleTrack) {
-      setVttTrackUrl(null);
+      setVttTrackUrl((prev) => {
+        revokeVttBlobUrl(prev);
+        return null;
+      });
       return;
     }
 
@@ -338,71 +263,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const srcUrl = activeSubtitleTrack.src;
       if (!srcUrl) {
         if (!isCancelled) {
-          setVttTrackUrl(null);
+          setVttTrackUrl((prev) => {
+            revokeVttBlobUrl(prev);
+            return null;
+          });
         }
         return;
       }
 
       try {
-        let text = '';
-
-        // 1. Direct fetch if local blob or data URI
-        if (srcUrl.startsWith('blob:') || srcUrl.startsWith('data:')) {
-          const resp = await fetch(srcUrl);
-          if (resp.ok) {
-            text = await resp.text();
-          }
-        } else {
-          // 2. Fetch via local server proxy endpoint (/api/subtitles?url=...)
-          try {
-            const proxyEndpoint = `/api/subtitles?url=${encodeURIComponent(srcUrl)}`;
-            const resp = await fetch(proxyEndpoint);
-            if (resp.ok) {
-              text = await resp.text();
-            }
-          } catch (proxyErr) {
-            console.warn('Local subtitle proxy fetch error:', proxyErr);
-          }
-
-          // 3. Direct fetch fallback
-          if (!text) {
-            try {
-              const resp = await fetch(srcUrl);
-              if (resp.ok) {
-                text = await resp.text();
-              }
-            } catch (directErr) {
-              console.warn('Direct subtitle fetch failed:', directErr);
-            }
-          }
-
-          // 4. Public proxy fallback
-          if (!text) {
-            try {
-              const publicProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(srcUrl)}`;
-              const resp = await fetch(publicProxy);
-              if (resp.ok) {
-                text = await resp.text();
-              }
-            } catch (pubErr) {
-              console.warn('Public CORS proxy fetch failed:', pubErr);
-            }
-          }
+        const { blobUrl, error } = await loadSubtitleAsBlobUrl(srcUrl);
+        if (isCancelled) {
+          revokeVttBlobUrl(blobUrl);
+          return;
         }
 
-        if (!isCancelled && text) {
-          const cues = parseSubtitleContentToCues(text);
-          if (cues.length > 0) {
-            const vttUrl = buildVttDataUrl(cues);
-            setVttTrackUrl(vttUrl);
-          } else {
-            setVttTrackUrl(null);
+        if (blobUrl) {
+          setVttTrackUrl((prev) => {
+            revokeVttBlobUrl(prev);
+            return blobUrl;
+          });
+        } else {
+          if (error) {
+            console.warn('[VideoPlayer] Subtitle fallback warning:', error);
           }
+          setVttTrackUrl((prev) => {
+            revokeVttBlobUrl(prev);
+            return null;
+          });
         }
       } catch (err) {
-        console.error('Failed to load subtitle tracks:', err);
+        console.warn('[VideoPlayer] Subtitle load failed gracefully:', err);
         if (!isCancelled) {
-          setVttTrackUrl(null);
+          setVttTrackUrl((prev) => {
+            revokeVttBlobUrl(prev);
+            return null;
+          });
         }
       }
     };
@@ -413,6 +309,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       isCancelled = true;
     };
   }, [subtitlesEnabled, activeSubtitleTrack?.id, activeSubtitleTrack?.src]);
+
+  // Clean up blob URL on player unmount
+  useEffect(() => {
+    return () => {
+      revokeVttBlobUrl(vttTrackUrl);
+    };
+  }, [vttTrackUrl]);
 
   // Native Track Mode Syncing
   useEffect(() => {
@@ -678,12 +581,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         >
           {subtitlesEnabled && vttTrackUrl && (
             <track
-              key={activeSubtitleTrack?.id || 'vtt-sub'}
+              key={`${activeSubtitleTrack?.id || 'sub'}-${vttTrackUrl}`}
               kind="subtitles"
               src={vttTrackUrl}
               srcLang="en"
-              label={activeSubtitleTrack?.label || 'Subtitles'}
+              label={activeSubtitleTrack?.label || activeSubtitleTrack?.language || 'Subtitles'}
               default
+              onError={(e) => {
+                console.warn('[VideoPlayer] Subtitle track element error handled gracefully:', e);
+              }}
             />
           )}
         </video>

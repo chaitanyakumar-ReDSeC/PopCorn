@@ -491,12 +491,28 @@ export function parseSeriesCSV(csvText: string): MediaItem[] {
     const subtitleTracks: SubtitleTrack[] = [];
     const subUrl = subtitleIdx !== -1 ? cols[subtitleIdx]?.replace(/^["']|["']$/g, '').trim() : '';
     if (subUrl) {
-      subtitleTracks.push({
-        id: 'sub-0',
-        language: 'English',
-        label: 'English Subtitles',
-        src: subUrl,
-        isDefault: true,
+      const subList = subUrl.includes(';') ? subUrl.split(';') : [subUrl];
+      subList.forEach((rawSub, sIdx) => {
+        const sub = rawSub.trim();
+        if (!sub) return;
+
+        let lang = 'English';
+        const lower = sub.toLowerCase();
+        if (lower.includes('hin')) lang = 'Hindi';
+        else if (lower.includes('tel')) lang = 'Telugu';
+        else if (lower.includes('tam')) lang = 'Tamil';
+        else if (lower.includes('spa')) lang = 'Spanish';
+        else if (lower.includes('fre') || lower.includes('fra')) lang = 'French';
+        else if (lower.includes('ger') || lower.includes('deu')) lang = 'German';
+        else if (lower.includes('eng')) lang = 'English';
+
+        subtitleTracks.push({
+          id: `sub-${sIdx}`,
+          language: lang,
+          label: `${lang} Subtitles`,
+          src: sub,
+          isDefault: sIdx === 0,
+        });
       });
     }
 
