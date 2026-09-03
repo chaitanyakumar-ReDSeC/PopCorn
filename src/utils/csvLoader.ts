@@ -523,7 +523,7 @@ export function parseSeriesCSV(csvText: string): MediaItem[] {
 
 export async function fetchMoviesFromCSV(): Promise<MediaItem[]> {
   try {
-    const res = await fetch(`/movies.csv?t=${Date.now()}`);
+    const res = await fetch(`./movies.csv?t=${Date.now()}`);
     if (!res.ok) return [];
     const text = await res.text();
     return parseMoviesCSV(text);
@@ -535,7 +535,7 @@ export async function fetchMoviesFromCSV(): Promise<MediaItem[]> {
 
 export async function fetchSeriesFromCSV(): Promise<MediaItem[]> {
   try {
-    const res = await fetch(`/series.csv?t=${Date.now()}`);
+    const res = await fetch(`./series.csv?t=${Date.now()}`);
     if (!res.ok) return [];
     const text = await res.text();
     return parseSeriesCSV(text);
