@@ -57,6 +57,7 @@ const subtitleProxyPlugin = (): Plugin => ({
 
 export default defineConfig(() => {
   return {
+    base: '/PopCorn/',
     plugins: [react(), tailwindcss(), subtitleProxyPlugin()],
     resolve: {
       alias: {
