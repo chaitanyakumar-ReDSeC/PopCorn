@@ -22,6 +22,7 @@ import { AudioCard } from './AudioCard';
 import { SubtitleCard } from './SubtitleCard';
 import { BrowseMediaModal } from './BrowseMediaModal';
 import { StreamMediaForm } from './StreamMediaForm';
+import { AudioTrackFlagChecker } from './AudioTrackFlagChecker';
 import { MediaItem, PlaybackSpeed, AudioTrack, SubtitleTrack, Episode } from '../types';
 import { stopAllGlobalPlayback } from '../utils/mediaControl';
 
@@ -713,14 +714,17 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
             {/* STEP 1: CHOOSE OPTIONS (Choose a Local Media vs Stream Through URL) */}
             {modalStep === 'choose' && (
               <div className="space-y-4">
-                <div className="text-center space-y-1">
+                {/* Browser Flag Checker for Multiple Audio Tracks at the TOP */}
+                <AudioTrackFlagChecker />
+
+                <div className="text-center space-y-1 pt-1">
                   <h3 className="text-lg font-bold text-white">Select Media Source</h3>
                   <p className="text-xs text-neutral-400">
                     Choose how you want to load media into Private Screen
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Option 1: Choose a Local Media */}
                   <button
                     onClick={() => setModalStep('browse')}
