@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -74,6 +74,40 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Subtitle VTT Track URL & Audio Toast HUD
   const [vttTrackUrl, setVttTrackUrl] = useState<string | null>(null);
   const [audioToastText, setAudioToastText] = useState<string | null>(null);
+
+  // Auto-hide controls after 5 seconds of inactivity (wakes on mouse move or screen tap)
+  const [showControls, setShowControls] = useState<boolean>(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const clearControlsTimer = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resetControlsTimer = useCallback(() => {
+    clearControlsTimer();
+    setShowControls(true);
+
+    // If currently playing and not navigating popup menus, auto-hide controls after 5 seconds
+    if (isPlaying && !showSpeedMenu && !showShortcutsModal) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 5000);
+    }
+  }, [isPlaying, showSpeedMenu, showShortcutsModal, clearControlsTimer]);
+
+  // Sync controls timer with playback and modal state
+  useEffect(() => {
+    if (isPlaying) {
+      resetControlsTimer();
+    } else {
+      setShowControls(true);
+      clearControlsTimer();
+    }
+    return () => clearControlsTimer();
+  }, [isPlaying, showSpeedMenu, showShortcutsModal, resetControlsTimer, clearControlsTimer]);
 
   const speeds: PlaybackSpeed[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -562,14 +596,32 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const progressPct = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
   const volumePct = (isMuted ? 0 : volume) * 100;
 
+  const handleVideoClick = (e: React.MouseEvent<HTMLVideoElement>) => {
+    e.stopPropagation();
+    // If controls are hidden, first tap/click wakes them up for 5 seconds without pausing
+    if (!showControls) {
+      resetControlsTimer();
+      return;
+    }
+    // If controls are already showing, clicking toggles play/pause
+    togglePlay();
+    resetControlsTimer();
+  };
+
   return (
-    <div className="relative group w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+    <div
+      className={`relative group w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl select-none ${
+        !showControls && isPlaying ? 'cursor-none' : 'cursor-default'
+      }`}
+      onMouseMove={resetControlsTimer}
+      onTouchStart={resetControlsTimer}
+    >
       {/* Video element stage */}
       <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
         <video
           ref={videoRef}
           className="w-full h-full object-contain cursor-pointer"
-          onClick={togglePlay}
+          onClick={handleVideoClick}
           playsInline
           onPlay={handlePlay}
           onPause={handlePause}
@@ -691,37 +743,49 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
 
         {/* Top Header Overlay in Player */}
-        <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/90 via-black/40 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-between z-20 pointer-events-none">
-          <div className="flex items-center space-x-3">
-            <h2 className="text-white font-bold text-sm sm:text-base tracking-wide truncate max-w-md">
+        <div
+          className={`absolute top-0 inset-x-0 bg-gradient-to-b from-black/90 via-black/40 to-transparent p-3 sm:p-4 transition-all duration-300 flex items-center justify-between z-20 pointer-events-none ${
+            showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
+          }`}
+        >
+          <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 pr-2">
+            <h2 className="text-white font-bold text-xs sm:text-base tracking-wide truncate">
               {title}
             </h2>
           </div>
 
-          <div className="flex items-center space-x-2 text-xs text-neutral-300">
-            <span className="bg-black/80 border border-white/10 px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[10px]">
+          <div className="flex items-center space-x-1.5 sm:space-x-2 text-[10px] sm:text-xs text-neutral-300 shrink-0">
+            <span className="bg-black/80 border border-white/10 px-1.5 sm:px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[9px] sm:text-[10px]">
               <Sparkles className="w-3 h-3 text-red-500" />
               <span>{mediaResolution}</span>
             </span>
-            <span className="bg-black/80 border border-white/10 px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[10px]">
+            <span className="bg-black/80 border border-white/10 px-1.5 sm:px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[9px] sm:text-[10px]">
               <Radio className="w-3 h-3 text-red-500" />
               <span>Audio: {activeAudioTrack?.language || 'Default'}</span>
             </span>
             {subtitlesEnabled && activeSubtitleTrack && (
-              <span className="bg-black/80 border border-white/10 px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[10px]">
+              <span className="bg-black/80 border border-white/10 px-1.5 sm:px-2 py-0.5 rounded flex items-center space-x-1 font-mono text-[9px] sm:text-[10px]">
                 <Captions className="w-3 h-3 text-red-500" />
-                <span>Subtitles: {activeSubtitleTrack.language}</span>
+                <span className="hidden xs:inline sm:inline">Sub: </span>
+                <span>{activeSubtitleTrack.language}</span>
               </span>
             )}
           </div>
         </div>
 
         {/* Custom High-Contrast Control Bar Overlay (Red, Black, White) */}
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pt-8 opacity-100 group-hover:opacity-100 transition-opacity duration-300 z-20">
-          
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            resetControlsTimer();
+          }}
+          className={`absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/90 to-transparent p-3 sm:p-4 pt-6 sm:pt-8 transition-all duration-300 z-20 ${
+            showControls ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+          }`}
+        >
           {/* Scrubber Progress Bar */}
-          <div className="relative mb-3 flex items-center space-x-3">
-            <span className="text-xs text-neutral-300 font-mono w-11 text-right">{formatTime(currentTime)}</span>
+          <div className="relative mb-2.5 sm:mb-3 flex items-center space-x-2 sm:space-x-3">
+            <span className="text-[10px] sm:text-xs text-neutral-300 font-mono w-9 sm:w-11 text-right">{formatTime(currentTime)}</span>
             <input
               type="range"
               min={0}
@@ -734,52 +798,53 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${progressPct}%, #262626 ${progressPct}%, #262626 100%)`
               }}
             />
-            <span className="text-xs text-neutral-400 font-mono w-11">{formatTime(duration)}</span>
+            <span className="text-[10px] sm:text-xs text-neutral-400 font-mono w-9 sm:w-11">{formatTime(duration)}</span>
           </div>
 
           {/* Controls Buttons Row */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-1.5 sm:gap-2">
             {/* Left Controls: Play, Pause, Backward 10s, Forward 10s */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               {/* Play / Pause */}
               <button
                 onClick={togglePlay}
                 title={isPlaying ? 'Pause' : 'Play'}
-                className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition shadow-2xl cursor-pointer"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition shadow-2xl cursor-pointer shrink-0"
               >
-                {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                {isPlaying ? <Pause className="w-4 h-4 sm:w-5 sm:h-5 fill-current" /> : <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current ml-0.5" />}
               </button>
 
               {/* Backward 10s */}
               <button
                 onClick={handleSeekBackward10}
                 title="Backward 10 Seconds"
-                className="w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 flex flex-col items-center justify-center text-xs font-bold transition cursor-pointer relative group/btn"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 flex flex-col items-center justify-center text-xs font-bold transition cursor-pointer relative group/btn shrink-0"
               >
-                <RotateCcw className="w-4 h-4 text-neutral-300 group-hover/btn:text-red-400" />
-                <span className="text-[9px] text-neutral-400 group-hover/btn:text-red-400 -mt-0.5">10s</span>
+                <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-300 group-hover/btn:text-red-400" />
+                <span className="text-[8px] sm:text-[9px] text-neutral-400 group-hover/btn:text-red-400 -mt-0.5">10s</span>
               </button>
 
               {/* Forward 10s */}
               <button
                 onClick={handleSeekForward10}
                 title="Forward 10 Seconds"
-                className="w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 flex flex-col items-center justify-center text-xs font-bold transition cursor-pointer relative group/btn"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 flex flex-col items-center justify-center text-xs font-bold transition cursor-pointer relative group/btn shrink-0"
               >
-                <RotateCw className="w-4 h-4 text-neutral-300 group-hover/btn:text-red-400" />
-                <span className="text-[9px] text-neutral-400 group-hover/btn:text-red-400 -mt-0.5">10s</span>
+                <RotateCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-300 group-hover/btn:text-red-400" />
+                <span className="text-[8px] sm:text-[9px] text-neutral-400 group-hover/btn:text-red-400 -mt-0.5">10s</span>
               </button>
 
               {/* Volume Slider */}
-              <div className="flex items-center space-x-1.5 ml-2 pl-2 border-l border-white/10">
+              <div className="flex items-center space-x-1 sm:space-x-1.5 ml-0.5 sm:ml-2 pl-1 sm:pl-2 border-l border-white/10">
                 <button
                   onClick={toggleMute}
-                  className="p-1.5 text-neutral-300 hover:text-white transition cursor-pointer"
+                  className="p-1 sm:p-1.5 text-neutral-300 hover:text-white transition cursor-pointer"
+                  title={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted || volume === 0 ? (
-                    <VolumeX className="w-5 h-5 text-red-500" />
+                    <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" />
                   ) : (
-                    <Volume2 className="w-5 h-5 text-neutral-200" />
+                    <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-200" />
                   )}
                 </button>
                 <input
@@ -789,7 +854,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   step={0.05}
                   value={isMuted ? 0 : volume}
                   onChange={handleVolumeChange}
-                  className="w-16 h-1 rounded-lg appearance-none cursor-pointer hidden sm:block outline-none"
+                  className="w-14 sm:w-16 h-1 rounded-lg appearance-none cursor-pointer hidden md:block outline-none"
                   style={{
                     background: `linear-gradient(to right, #dc2626 0%, #dc2626 ${volumePct}%, #262626 ${volumePct}%, #262626 100%)`
                   }}
@@ -798,42 +863,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
 
             {/* Right Controls: Subtitles (CC), Keyboard Shortcuts, Settings [Speed], FullScreen */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5 sm:space-x-2.5">
               {/* Subtitles (CC) Toggle Button */}
               <button
                 onClick={() => onToggleSubtitles?.(!subtitlesEnabled)}
                 title={subtitlesEnabled ? 'Hide Subtitles (V)' : 'Show Subtitles (V)'}
-                className={`p-2 rounded-xl transition cursor-pointer border flex items-center justify-center ${
+                className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer border flex items-center justify-center ${
                   subtitlesEnabled
                     ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/30'
                     : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white border-white/10 hover:border-red-500'
                 }`}
               >
-                <Captions className="w-4 h-4" />
+                <Captions className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
 
-              {/* Keyboard Shortcuts Icon Button */}
+              {/* Keyboard Shortcuts Icon Button (Hidden on small mobile screens) */}
               <button
                 onClick={() => setShowShortcutsModal(!showShortcutsModal)}
                 title="Keyboard Shortcuts (?)"
-                className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 transition cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 transition cursor-pointer hidden sm:flex items-center justify-center"
               >
-                <Keyboard className="w-4 h-4 text-neutral-300 hover:text-red-400" />
+                <Keyboard className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-300 hover:text-red-400" />
               </button>
 
               {/* Speed Settings Button & Dropdown Menu */}
               <div className="relative">
                 <button
                   onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                  className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 text-xs font-bold transition cursor-pointer"
+                  className="flex items-center space-x-1 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 text-[11px] sm:text-xs font-bold transition cursor-pointer"
                 >
-                  <Gauge className="w-3.5 h-3.5 text-red-500" />
+                  <Gauge className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-red-500" />
                   <span>{playbackSpeed}x</span>
                 </button>
 
                 {/* Speed Dropdown Menu */}
                 {showSpeedMenu && (
-                  <div className="absolute bottom-12 right-0 bg-neutral-900 border border-white/10 rounded-xl p-2 shadow-2xl min-w-[120px] z-30">
+                  <div className="absolute bottom-11 sm:bottom-12 right-0 bg-neutral-900 border border-white/10 rounded-xl p-2 shadow-2xl min-w-[110px] sm:min-w-[120px] z-30">
                     <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider px-2 py-1 border-b border-white/10">
                       Playback Speed
                     </div>
@@ -861,10 +926,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               {/* FullScreen Button */}
               <button
                 onClick={toggleFullscreen}
-                title="FullScreen (F)"
-                className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 transition cursor-pointer"
+                title={isFullscreen ? "Exit FullScreen (F)" : "FullScreen (F)"}
+                className="p-1.5 sm:p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white border border-white/10 hover:border-red-500 transition cursor-pointer"
               >
-                {isFullscreen ? <Minimize className="w-5 h-5 text-red-500" /> : <Maximize className="w-5 h-5 text-neutral-200" />}
+                {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5 text-red-500" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5 text-neutral-200" />}
               </button>
             </div>
           </div>

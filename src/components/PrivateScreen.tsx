@@ -324,21 +324,21 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
       {hasMedia ? (
         <div className="space-y-6">
           {/* Top Session Bar with Stop Screening Button */}
-          <div className="flex items-center justify-between bg-neutral-900 border border-white/10 px-5 py-3.5 rounded-xl shadow-2xl flex-wrap gap-3">
-            <div className="flex items-center space-x-3">
-              <span className={`w-2.5 h-2.5 rounded-full ${isMediaPlaying ? 'bg-red-600 animate-ping' : 'bg-red-500'}`} />
-              <div>
-                <h2 className="text-sm sm:text-base font-bold text-white tracking-wide truncate max-w-md sm:max-w-xl">
+          <div className="flex items-center justify-between bg-neutral-900 border border-white/10 px-3.5 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-2xl flex-wrap gap-2.5 sm:gap-3">
+            <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isMediaPlaying ? 'bg-red-600 animate-ping' : 'bg-red-500'}`} />
+              <div className="min-w-0">
+                <h2 className="text-xs sm:text-base font-bold text-white tracking-wide truncate max-w-[180px] xs:max-w-xs sm:max-w-md md:max-w-xl">
                   {activeTitle}
                 </h2>
-                <div className="flex items-center space-x-2 text-[10px] text-neutral-400">
-                  <span className="text-red-500 font-bold uppercase tracking-wider">Private Stream</span>
+                <div className="flex items-center space-x-1.5 sm:space-x-2 text-[9px] sm:text-[10px] text-neutral-400 truncate">
+                  <span className="text-red-500 font-bold uppercase tracking-wider">Private Screen</span>
                   <span>•</span>
                   <span>Audio: {activeAudioTrack?.language || 'Default'}</span>
                   {subtitlesEnabled && activeSubtitleTrack && (
                     <>
                       <span>•</span>
-                      <span>Subtitles: {activeSubtitleTrack.language}</span>
+                      <span>Sub: {activeSubtitleTrack.language}</span>
                     </>
                   )}
                 </div>
@@ -346,26 +346,28 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
             </div>
 
             {/* Top Action Buttons: Next Episode & Stop Screening */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
               {nextEpisode && (
                 <button
                   onClick={() => handleSwitchEpisode(nextEpisode)}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-lg"
+                  className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all cursor-pointer shadow-lg"
                   title={`Play Next Episode: S${nextEpisode.seasonNumber}:E${nextEpisode.episodeNumber}`}
                 >
                   <SkipForward className="w-3.5 h-3.5 fill-current" />
-                  <span>Next (S{nextEpisode.seasonNumber}:E{nextEpisode.episodeNumber})</span>
+                  <span className="hidden sm:inline">Next (S{nextEpisode.seasonNumber}:E{nextEpisode.episodeNumber})</span>
+                  <span className="sm:hidden">Next Ep</span>
                 </button>
               )}
 
               {/* Stop Screening Button */}
               <button
                 onClick={handleStopScreening}
-                className="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-neutral-950 hover:bg-red-600 text-neutral-300 hover:text-white text-xs font-bold uppercase tracking-wider border border-white/10 hover:border-red-600 transition-all cursor-pointer shadow-lg"
+                className="flex items-center space-x-1 sm:space-x-2 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-neutral-950 hover:bg-red-600 text-neutral-300 hover:text-white text-[11px] sm:text-xs font-bold uppercase tracking-wider border border-white/10 hover:border-red-600 transition-all cursor-pointer shadow-lg"
                 title="Stop playback and return to Private Screen menu"
               >
-                <Square className="w-3.5 h-3.5 fill-current text-red-500 hover:text-white" />
-                <span>Stop Screening</span>
+                <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current text-red-500 hover:text-white shrink-0" />
+                <span className="hidden xs:inline">Stop Screening</span>
+                <span className="xs:hidden">Stop Screening</span>
               </button>
             </div>
           </div>
