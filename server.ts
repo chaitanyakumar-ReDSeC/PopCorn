@@ -26,13 +26,28 @@ async function startServer() {
       return;
     }
 
+    let fetchUrl = targetUrl;
+    if (targetUrl.includes("archive.org/download/")) {
+      fetchUrl = targetUrl.replace("/download/", "/cors/");
+    }
+
     try {
-      const response = await fetch(targetUrl, {
+      let response = await fetch(fetchUrl, {
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PopCornMedia/1.0",
         },
       });
+
+      if (!response.ok && fetchUrl !== targetUrl) {
+        // Fallback to original targetUrl if /cors/ failed
+        response = await fetch(targetUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PopCornMedia/1.0",
+          },
+        });
+      }
 
       if (!response.ok) {
         res.status(response.status).send(`Upstream error: ${response.statusText}`);

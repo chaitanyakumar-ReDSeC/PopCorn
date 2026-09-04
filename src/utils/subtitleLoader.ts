@@ -1,15 +1,47 @@
 /**
  * Subtitle Loader & Parser Utility for Static & Dynamic Deployments (e.g. GitHub Pages)
  * 
- * Handles CORS restrictions on external hosts (such as archive.org) by utilizing
- * a cascading fallback of public CORS proxies, converts SRT format to WebVTT on the fly,
- * and produces safe same-origin Blob Object URLs (URL.createObjectURL) to assign to <track> elements.
+ * Handles CORS restrictions on external hosts (specifically archive.org and general HTTP/HTTPS URLs)
+ * by utilizing Archive.org's native CORS endpoint, a cascading fallback of public CORS proxies,
+ * converts SRT format to WebVTT on the fly, and produces safe same-origin Blob Object URLs
+ * (URL.createObjectURL) to assign to <track> elements without crashing the player.
  */
 
 export interface SubCue {
   start: number;
   end: number;
   text: string;
+}
+
+// In-memory cache for generated blob URLs to prevent redundant network fetches
+const subtitleBlobCache = new Map<string, string>();
+
+/**
+ * Checks if a given URL is hosted on Internet Archive (archive.org)
+ */
+export function isArchiveOrgUrl(url: string): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.includes('archive.org');
+  } catch {
+    return url.includes('archive.org');
+  }
+}
+
+/**
+ * Internet Archive officially provides a CORS-enabled endpoint:
+ * Replacing /download/ with /cors/ serves the file with "Access-Control-Allow-Origin: *"
+ * e.g. https://archive.org/download/item/sub.srt -> https://archive.org/cors/item/sub.srt
+ */
+export function getArchiveOrgCorsUrl(url: string): string {
+  if (!url) return url;
+  if (isArchiveOrgUrl(url)) {
+    if (url.includes('/download/')) {
+      return url.replace('/download/', '/cors/');
+    }
+  }
+  return url;
 }
 
 /**
@@ -22,16 +54,20 @@ export function isValidSubtitleText(text: string | null | undefined): boolean {
   const clean = text.replace(/^\uFEFF/, '').trim();
   if (clean.length < 5) return false;
 
-  // Reject HTML error pages from proxies or static 404s
+  // Reject HTML error pages from proxies, Cloudflare, or static 404s
   const lower = clean.toLowerCase();
   if (
     lower.startsWith('<!doctype') ||
     lower.startsWith('<html') ||
+    lower.includes('<head') ||
     lower.includes('<body') ||
     lower.includes('error code: 522') ||
+    lower.includes('404 not found') ||
+    lower.includes('502 bad gateway') ||
     lower.startsWith('{"error"') ||
     lower.startsWith('{"success":false') ||
-    lower.startsWith('{"status":')
+    lower.startsWith('{"status":') ||
+    lower.startsWith('{"message":')
   ) {
     return false;
   }
@@ -182,7 +218,7 @@ export function revokeVttBlobUrl(url: string | null | undefined): void {
  */
 export async function fetchSubtitleTextWithFallback(
   url: string,
-  timeoutMs = 5000
+  timeoutMs = 4000
 ): Promise<string | null> {
   if (!url) return null;
 
@@ -197,7 +233,7 @@ export async function fetchSubtitleTextWithFallback(
         if (isValidSubtitleText(txt)) return txt;
       }
     } catch (e) {
-      console.warn('Failed to read local subtitle blob/data URL:', e);
+      console.warn('[SubtitleLoader] Failed to read local subtitle blob/data URL:', e);
     }
     return null;
   }
@@ -215,7 +251,7 @@ export async function fetchSubtitleTextWithFallback(
         if (isValidSubtitleText(txt)) return txt;
       }
     } catch (e) {
-      console.warn('Same-origin subtitle fetch failed:', e);
+      console.warn('[SubtitleLoader] Same-origin subtitle fetch failed:', e);
     }
   }
 
@@ -224,7 +260,109 @@ export async function fetchSubtitleTextWithFallback(
 
   const attempts: { name: string; fn: Fetcher }[] = [];
 
-  // Attempt A: Local backend proxy (works in Node/Express dev & full-stack container)
+  // Priority 1: If Archive.org URL, use Archive.org's native /cors/ endpoint!
+  // Internet Archive officially enables "Access-Control-Allow-Origin: *" on /cors/
+  if (isArchiveOrgUrl(trimmedUrl)) {
+    const archiveCorsUrl = getArchiveOrgCorsUrl(trimmedUrl);
+    attempts.push({
+      name: 'archive-org-native-cors',
+      fn: async () => {
+        const res = await fetchWithTimeout(archiveCorsUrl, timeoutMs);
+        if (res.ok) {
+          const txt = await res.text();
+          if (isValidSubtitleText(txt)) return txt;
+        }
+        return null;
+      },
+    });
+  }
+
+  // Priority 2: Direct fetch (in case upstream has Access-Control-Allow-Origin: *)
+  attempts.push({
+    name: 'direct-fetch',
+    fn: async () => {
+      const res = await fetchWithTimeout(trimmedUrl, Math.min(timeoutMs, 2500));
+      if (res.ok) {
+        const txt = await res.text();
+        if (isValidSubtitleText(txt)) return txt;
+      }
+      return null;
+    },
+  });
+
+  // Priority 3: cors.sh proxy (high reliability, preserves raw text)
+  attempts.push({
+    name: 'cors-sh-proxy',
+    fn: async () => {
+      const proxyUrl = `https://proxy.cors.sh/${trimmedUrl}`;
+      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
+      if (res.ok) {
+        const txt = await res.text();
+        if (isValidSubtitleText(txt)) return txt;
+      }
+      return null;
+    },
+  });
+
+  // Priority 4: api.cors.lol proxy
+  attempts.push({
+    name: 'cors-lol-proxy',
+    fn: async () => {
+      const proxyUrl = `https://api.cors.lol/?url=${encodeURIComponent(trimmedUrl)}`;
+      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
+      if (res.ok) {
+        const txt = await res.text();
+        if (isValidSubtitleText(txt)) return txt;
+      }
+      return null;
+    },
+  });
+
+  // Priority 5: allorigins.win (raw mode)
+  attempts.push({
+    name: 'allorigins-raw',
+    fn: async () => {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(trimmedUrl)}`;
+      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
+      if (res.ok) {
+        const txt = await res.text();
+        if (isValidSubtitleText(txt)) return txt;
+      }
+      return null;
+    },
+  });
+
+  // Priority 6: allorigins.win (JSON mode - handles origins that drop raw text headers)
+  attempts.push({
+    name: 'allorigins-json',
+    fn: async () => {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(trimmedUrl)}`;
+      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data.contents === 'string' && isValidSubtitleText(data.contents)) {
+          return data.contents;
+        }
+      }
+      return null;
+    },
+  });
+
+  // Priority 7: corsproxy.io (public CORS proxy fallback)
+  attempts.push({
+    name: 'corsproxy-io',
+    fn: async () => {
+      const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(trimmedUrl)}`;
+      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
+      if (res.ok) {
+        const txt = await res.text();
+        if (isValidSubtitleText(txt)) return txt;
+      }
+      return null;
+    },
+  });
+
+  // Priority 8: Local backend proxy (works in Node/Express dev & full-stack container)
   if (typeof window !== 'undefined' && !window.location.hostname.includes('github.io')) {
     attempts.push({
       name: 'local-api-proxy',
@@ -242,64 +380,7 @@ export async function fetchSubtitleTextWithFallback(
     });
   }
 
-  // Attempt B: Direct fetch (in case upstream has Access-Control-Allow-Origin: *)
-  attempts.push({
-    name: 'direct-fetch',
-    fn: async () => {
-      const res = await fetchWithTimeout(trimmedUrl, Math.min(timeoutMs, 3000));
-      if (res.ok) {
-        const txt = await res.text();
-        if (isValidSubtitleText(txt)) return txt;
-      }
-      return null;
-    },
-  });
-
-  // Attempt C: corsproxy.io (public CORS proxy recommended for GitHub Pages)
-  attempts.push({
-    name: 'corsproxy-io',
-    fn: async () => {
-      const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(trimmedUrl)}`;
-      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
-      if (res.ok) {
-        const txt = await res.text();
-        if (isValidSubtitleText(txt)) return txt;
-      }
-      return null;
-    },
-  });
-
-  // Attempt D: allorigins.win (raw mode)
-  attempts.push({
-    name: 'allorigins-raw',
-    fn: async () => {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(trimmedUrl)}`;
-      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
-      if (res.ok) {
-        const txt = await res.text();
-        if (isValidSubtitleText(txt)) return txt;
-      }
-      return null;
-    },
-  });
-
-  // Attempt E: allorigins.win (JSON mode - handles origins that drop raw text headers)
-  attempts.push({
-    name: 'allorigins-json',
-    fn: async () => {
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(trimmedUrl)}`;
-      const res = await fetchWithTimeout(proxyUrl, timeoutMs);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && typeof data.contents === 'string' && isValidSubtitleText(data.contents)) {
-          return data.contents;
-        }
-      }
-      return null;
-    },
-  });
-
-  // Attempt F: codetabs proxy
+  // Priority 9: codetabs proxy
   attempts.push({
     name: 'codetabs-proxy',
     fn: async () => {
@@ -325,26 +406,35 @@ export async function fetchSubtitleTextWithFallback(
     }
   }
 
-  console.warn(`[SubtitleLoader] All CORS proxies and direct fetches failed for: ${trimmedUrl}`);
+  console.warn(`[SubtitleLoader] All CORS proxies and direct fetches exhausted for: ${trimmedUrl}`);
   return null;
 }
 
 /**
  * High-level helper: Fetches subtitle through CORS proxy if needed,
  * converts to WebVTT, creates an inline Blob URL, and returns it safely.
+ * Caches successful blob URLs to prevent redundant network calls.
  *
  * @returns {Promise<{ blobUrl: string | null; error?: string }>}
  */
 export async function loadSubtitleAsBlobUrl(
   url: string,
-  timeoutMs = 5000
+  timeoutMs = 4000
 ): Promise<{ blobUrl: string | null; error?: string }> {
   if (!url) {
     return { blobUrl: null };
   }
 
+  const trimmed = url.trim();
+
+  // If already in blob cache, return immediately
+  const cached = subtitleBlobCache.get(trimmed);
+  if (cached) {
+    return { blobUrl: cached };
+  }
+
   try {
-    const rawText = await fetchSubtitleTextWithFallback(url, timeoutMs);
+    const rawText = await fetchSubtitleTextWithFallback(trimmed, timeoutMs);
     if (!rawText) {
       return {
         blobUrl: null,
@@ -354,6 +444,10 @@ export async function loadSubtitleAsBlobUrl(
 
     const vttContent = convertSrtToWebVtt(rawText);
     const blobUrl = createVttBlobUrl(vttContent);
+
+    // Cache the blob URL for instant language switching
+    subtitleBlobCache.set(trimmed, blobUrl);
+
     return { blobUrl };
   } catch (err: any) {
     const msg = err?.message || 'Unknown error loading subtitles';
@@ -369,9 +463,15 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'text/plain, text/vtt, application/x-subrip, */*',
+      },
+    });
     return res;
   } finally {
     clearTimeout(timer);
   }
 }
+

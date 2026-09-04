@@ -639,6 +639,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               srcLang="en"
               label={activeSubtitleTrack?.label || activeSubtitleTrack?.language || 'Subtitles'}
               default
+              onLoad={(e) => {
+                const trackElem = e.currentTarget as HTMLTrackElement;
+                if (trackElem && trackElem.track) {
+                  trackElem.track.mode = subtitlesEnabled ? 'showing' : 'hidden';
+                }
+              }}
               onError={(e) => {
                 console.warn('[VideoPlayer] Subtitle track element error handled gracefully:', e);
               }}

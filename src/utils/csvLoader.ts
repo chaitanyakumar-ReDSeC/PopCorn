@@ -219,20 +219,14 @@ export function parseMoviesCSV(csvText: string): MediaItem[] {
         const sub = rawSub.trim();
         if (!sub) return;
 
-        let lang = 'English';
-        const lower = sub.toLowerCase();
-        if (lower.includes('hin')) lang = 'Hindi';
-        else if (lower.includes('tel')) lang = 'Telugu';
-        else if (lower.includes('tam')) lang = 'Tamil';
-        else if (lower.includes('spa')) lang = 'Spanish';
-        else if (lower.includes('fre') || lower.includes('fra')) lang = 'French';
-        else if (lower.includes('ger') || lower.includes('deu')) lang = 'German';
-        else if (lower.includes('eng')) lang = 'English';
+        // The name of the subtitle is not taken from the CSV name or URL
+        // The default subtitle name is English
+        const lang = sIdx === 0 ? 'English' : `English ${sIdx + 1}`;
 
         subtitleTracks.push({
           id: `sub-${sIdx}`,
           language: lang,
-          label: `${lang} Subtitles`,
+          label: lang,
           src: sub,
           isDefault: sIdx === 0,
         });
@@ -496,20 +490,14 @@ export function parseSeriesCSV(csvText: string): MediaItem[] {
         const sub = rawSub.trim();
         if (!sub) return;
 
-        let lang = 'English';
-        const lower = sub.toLowerCase();
-        if (lower.includes('hin')) lang = 'Hindi';
-        else if (lower.includes('tel')) lang = 'Telugu';
-        else if (lower.includes('tam')) lang = 'Tamil';
-        else if (lower.includes('spa')) lang = 'Spanish';
-        else if (lower.includes('fre') || lower.includes('fra')) lang = 'French';
-        else if (lower.includes('ger') || lower.includes('deu')) lang = 'German';
-        else if (lower.includes('eng')) lang = 'English';
+        // The name of the subtitle is not taken from the CSV name or URL
+        // The default subtitle name is English
+        const lang = sIdx === 0 ? 'English' : `English ${sIdx + 1}`;
 
         subtitleTracks.push({
           id: `sub-${sIdx}`,
           language: lang,
-          label: `${lang} Subtitles`,
+          label: lang,
           src: sub,
           isDefault: sIdx === 0,
         });

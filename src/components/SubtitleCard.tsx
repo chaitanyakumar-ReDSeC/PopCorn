@@ -87,23 +87,13 @@ export const SubtitleCard: React.FC<SubtitleCardProps> = ({
     try {
       const { blobUrl, error } = await loadSubtitleAsBlobUrl(inputUrl.trim());
       if (blobUrl) {
-        let lang = inputLang.trim();
-        if (!lang) {
-          const lower = inputUrl.toLowerCase();
-          if (lower.includes('hin')) lang = 'Hindi';
-          else if (lower.includes('tel')) lang = 'Telugu';
-          else if (lower.includes('tam')) lang = 'Tamil';
-          else if (lower.includes('spa')) lang = 'Spanish';
-          else if (lower.includes('fre') || lower.includes('fra')) lang = 'French';
-          else if (lower.includes('ger') || lower.includes('deu')) lang = 'German';
-          else lang = 'English';
-        }
+        const lang = inputLang.trim() || 'English';
 
         const newTrack: SubtitleTrack = {
           id: `sub-url-${Date.now()}`,
           language: lang,
-          label: `${lang} (CORS Proxy Track)`,
-          src: blobUrl,
+          label: lang,
+          src: inputUrl.trim(),
         };
 
         if (onAddSubtitleTrack) {
