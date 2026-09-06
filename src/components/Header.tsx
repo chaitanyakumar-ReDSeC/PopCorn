@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search media..."
+              placeholder="Search title..."
               className="w-full bg-neutral-950 border border-white/10 focus:border-red-600 rounded-lg py-1.5 pl-8 pr-3 text-xs text-white placeholder-neutral-500 outline-none transition"
             />
           </div>

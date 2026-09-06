@@ -31,8 +31,8 @@ export const MovieGrid: React.FC<MovieGridProps> = ({ onPlayMovie, searchQuery, 
 
       {filteredMovies.length === 0 ? (
         <div className="bg-neutral-900 border border-white/5 rounded-xl p-12 text-center text-neutral-400">
-          <p className="text-base font-bold text-white">No Movies in Catalog</p>
-          <p className="text-xs mt-1 text-neutral-400">Add movie records to movies.csv or stream directly using Private Screen.</p>
+          <p className="text-base font-bold text-white">No Movies Found</p>
+          <p className="text-xs mt-1 text-neutral-400">Coming soon.</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

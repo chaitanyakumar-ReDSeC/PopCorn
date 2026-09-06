@@ -136,20 +136,6 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                 </button>
               </div>
 
-              {/* Quick Search */}
-              {onSearchChange && (
-                <div className="relative w-full">
-                  <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Search movies, series, titles..."
-                    className="w-full bg-neutral-950 border border-white/10 focus:border-red-600 rounded-lg py-2 pl-9 pr-3 text-xs text-white placeholder-neutral-500 outline-none transition"
-                  />
-                </div>
-              )}
-
               {/* Primary Navigation Tabs */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between px-1 pb-1">
@@ -278,7 +264,6 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                     </div>
                     <div className="text-left">
                       <span className="block font-bold leading-tight">Private Screen</span>
-                      <span className="text-[10px] text-neutral-400 font-normal">Video.js Engine</span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-1.5 bg-red-600/30 border border-red-500/30 px-2 py-0.5 rounded-full">
@@ -287,61 +272,12 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   </div>
                 </button>
               </div>
-
-              {/* Dedicated Private Screen Card */}
-              <div className="bg-neutral-950 p-4 rounded-xl border border-white/10 shadow-lg space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1.5 text-red-500 font-bold text-[11px] uppercase tracking-wider">
-                    <Shield className="w-3.5 h-3.5" />
-                    <span>Private Screening</span>
-                  </div>
-                  <span className="text-[10px] bg-red-600/20 text-red-400 border border-red-600/30 px-1.5 py-0.5 rounded font-mono">
-                    PRO
-                  </span>
-                </div>
-                <p className="text-xs text-neutral-400 leading-relaxed">
-                  Dedicated Video.js player with multi-audio controls, speed settings, subtitles, and direct URL streaming.
-                </p>
-                <button
-                  id="mobile-launch-private-screen-card-btn"
-                  onClick={() => {
-                    onOpenPrivateScreenModal();
-                    onClose();
-                  }}
-                  className="w-full py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-lg font-bold flex items-center justify-center gap-2 text-xs tracking-wider uppercase transition shadow-md shadow-red-600/30 cursor-pointer"
-                >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Open Screening Options</span>
-                </button>
-              </div>
-
-              {/* Features Included */}
-              <div className="bg-neutral-950 rounded-xl p-3 border border-white/5 space-y-2 text-xs">
-                <div className="flex items-center space-x-2 text-red-500 font-bold uppercase tracking-widest text-[10px]">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Integrated Features</span>
-                </div>
-                <ul className="space-y-1.5 text-neutral-400 text-[11px]">
-                  <li className="flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0" />
-                    <span>Video.js Engine with Full Multi-Audio</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0" />
-                    <span>CORS-Proxied English Subtitles</span>
-                  </li>
-                  <li className="flex items-center space-x-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0" />
-                    <span>Local Files & Direct URL Streaming</span>
-                  </li>
-                </ul>
-              </div>
             </div>
 
             {/* Footer */}
             <div className="pt-4 border-t border-white/10 text-center mt-4">
               <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold">
-                POPCORN MEDIA • SLEEK INTERFACE
+                POPCORN • chaitanyakumar-ReDSeC
               </p>
             </div>
           </motion.div>

@@ -119,8 +119,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Horizontal Carousel Row */}
         {topMovies.length === 0 ? (
           <div className="bg-neutral-900 border border-white/5 rounded-2xl p-8 text-center text-neutral-400">
-            <p className="text-sm font-bold text-white">No movies found</p>
-            <p className="text-xs text-neutral-500 mt-1">Add movie records to movies.csv</p>
+            <p className="text-sm font-bold text-white">No Movies Found</p>
+            <p className="text-xs text-neutral-500 mt-1">Coming soon.</p>
           </div>
         ) : (
           <div
@@ -236,8 +236,8 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Horizontal Series Carousel Row */}
         {topSeries.length === 0 ? (
           <div className="bg-neutral-900 border border-white/5 rounded-2xl p-8 text-center text-neutral-400">
-            <p className="text-sm font-bold text-white">No series found</p>
-            <p className="text-xs text-neutral-500 mt-1">Add series records to series.csv</p>
+            <p className="text-sm font-bold text-white">No Series Found</p>
+            <p className="text-xs text-neutral-500 mt-1">Coming soon.</p>
           </div>
         ) : (
           <div
