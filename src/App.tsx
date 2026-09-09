@@ -64,15 +64,16 @@ export default function App() {
   // Handler to launch Private Screen with a specific movie or episode
   const handleLaunchPrivateScreen = (media: MediaItem, customVideoUrl?: string, customTitle?: string) => {
     stopAllGlobalPlayback();
-    if (customVideoUrl || customTitle) {
-      setSelectedMedia({
-        ...media,
-        videoUrl: customVideoUrl || media.videoUrl,
-        title: customTitle || media.title,
-      });
-    } else {
-      setSelectedMedia(media);
-    }
+    const finalVideoUrl = customVideoUrl || media.videoUrl;
+    const updatedAudioTracks = (media.audioTracks || []).map((t) =>
+      t.isOriginal || t.id === 'orig' ? { ...t, videoUrl: finalVideoUrl } : t
+    );
+    setSelectedMedia({
+      ...media,
+      videoUrl: finalVideoUrl,
+      title: customTitle || media.title,
+      audioTracks: updatedAudioTracks,
+    });
     setViewMode('private_screen');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

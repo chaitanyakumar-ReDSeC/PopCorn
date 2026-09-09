@@ -13,7 +13,9 @@ export interface SubCue {
   text: string;
 }
 
-// In-memory cache for generated blob URLs to prevent redundant network fetches
+// In-memory cache for converted WebVTT strings (url -> vtt string) to eliminate network refetches
+const subtitleTextCache = new Map<string, string>();
+// In-memory cache for generated active blob URLs to prevent redundant network fetches
 const subtitleBlobCache = new Map<string, string>();
 
 /**
@@ -208,6 +210,12 @@ export function revokeVttBlobUrl(url: string | null | undefined): void {
       URL.revokeObjectURL(url);
     } catch {
       // Ignore revocation errors
+    }
+    // Evict this blob URL from cache so it is never served as a stale/dead reference
+    for (const [key, val] of subtitleBlobCache.entries()) {
+      if (val === url) {
+        subtitleBlobCache.delete(key);
+      }
     }
   }
 }
@@ -427,10 +435,18 @@ export async function loadSubtitleAsBlobUrl(
 
   const trimmed = url.trim();
 
-  // If already in blob cache, return immediately
+  // 1. If already in active blob cache, return immediately
   const cached = subtitleBlobCache.get(trimmed);
   if (cached) {
     return { blobUrl: cached };
+  }
+
+  // 2. If already in WebVTT text cache, recreate an active blob URL immediately with 0ms latency
+  const cachedVtt = subtitleTextCache.get(trimmed);
+  if (cachedVtt) {
+    const blobUrl = createVttBlobUrl(cachedVtt);
+    subtitleBlobCache.set(trimmed, blobUrl);
+    return { blobUrl };
   }
 
   try {
@@ -443,9 +459,10 @@ export async function loadSubtitleAsBlobUrl(
     }
 
     const vttContent = convertSrtToWebVtt(rawText);
+    subtitleTextCache.set(trimmed, vttContent);
     const blobUrl = createVttBlobUrl(vttContent);
 
-    // Cache the blob URL for instant language switching
+    // Cache the blob URL for instant switching
     subtitleBlobCache.set(trimmed, blobUrl);
 
     return { blobUrl };

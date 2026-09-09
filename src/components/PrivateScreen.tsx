@@ -85,11 +85,32 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
   // Sync state when initialMedia prop changes
   useEffect(() => {
     if (initialMedia && initialMedia.id !== 'none' && initialMedia.videoUrl) {
-      setCurrentMedia(initialMedia);
-      setActiveVideoUrl(initialMedia.videoUrl);
+      const urlToPlay = initialMedia.videoUrl;
+      const updatedAudioTracks = (initialMedia.audioTracks || []).map((t) =>
+        t.isOriginal || t.id === 'orig' ? { ...t, videoUrl: urlToPlay } : t
+      );
+      if (updatedAudioTracks.length === 0) {
+        updatedAudioTracks.push({
+          id: 'orig',
+          language: 'Original',
+          label: 'Original Audio',
+          channels: 'Stereo / 5.1',
+          codec: 'AAC/AC3',
+          videoUrl: urlToPlay,
+          isOriginal: true,
+          isDefault: true,
+        });
+      }
+
+      setCurrentMedia({
+        ...initialMedia,
+        videoUrl: urlToPlay,
+        audioTracks: updatedAudioTracks,
+      });
+      setActiveVideoUrl(urlToPlay);
       setActiveTitle(initialMedia.title);
-      if (initialMedia.audioTracks.length > 0) {
-        setActiveAudioTrackId(initialMedia.audioTracks[0].id);
+      if (updatedAudioTracks.length > 0) {
+        setActiveAudioTrackId(updatedAudioTracks[0].id);
       }
       if (initialMedia.subtitleTracks.length > 0) {
         setActiveSubtitleTrackId(initialMedia.subtitleTracks[0].id);
@@ -139,12 +160,32 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
     episodeVideoUrl?: string,
     episodeTitle?: string
   ) => {
-    setCurrentMedia(media);
     const urlToPlay = episodeVideoUrl || media.videoUrl;
+    const updatedAudioTracks = (media.audioTracks || []).map((t) =>
+      t.isOriginal || t.id === 'orig' ? { ...t, videoUrl: urlToPlay } : t
+    );
+    if (updatedAudioTracks.length === 0 && urlToPlay) {
+      updatedAudioTracks.push({
+        id: 'orig',
+        language: 'Original',
+        label: 'Original Audio',
+        channels: 'Stereo / 5.1',
+        codec: 'AAC/AC3',
+        videoUrl: urlToPlay,
+        isOriginal: true,
+        isDefault: true,
+      });
+    }
+
+    setCurrentMedia({
+      ...media,
+      videoUrl: urlToPlay,
+      audioTracks: updatedAudioTracks,
+    });
     setActiveVideoUrl(urlToPlay);
     setActiveTitle(episodeTitle || media.title);
-    if (media.audioTracks.length > 0) {
-      setActiveAudioTrackId(media.audioTracks[0].id);
+    if (updatedAudioTracks.length > 0) {
+      setActiveAudioTrackId(updatedAudioTracks[0].id);
     }
     if (media.subtitleTracks.length > 0) {
       setActiveSubtitleTrackId(media.subtitleTracks[0].id);
@@ -219,15 +260,30 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
   ) => {
     if (extractedAudio && extractedAudio.length > 0) {
       setCurrentMedia((prev) => {
-        // If current media already has multi-tracks defined, do not wipe them
-        const hasExisting = prev.audioTracks.some((t) => Boolean(t.src || t.videoUrl));
-        if (hasExisting) return prev;
+        // If current media already has multiple audio tracks defined, preserve them
+        if (prev.audioTracks.length > 1) return prev;
+
+        const origTrack = prev.audioTracks[0] || {
+          id: 'orig',
+          language: 'Original',
+          label: 'Original Audio',
+          channels: 'Stereo / 5.1',
+          codec: 'AAC/AC3',
+          videoUrl: activeVideoUrl,
+          isOriginal: true,
+          isDefault: true,
+        };
+
+        const extraTracks = extractedAudio.filter(
+          (ea) => ea.id !== origTrack.id && ea.label !== origTrack.label
+        );
+
         return {
           ...prev,
-          audioTracks: extractedAudio,
+          audioTracks: [origTrack, ...extraTracks],
         };
       });
-      setActiveAudioTrackId((prev) => prev || extractedAudio[0].id);
+      setActiveAudioTrackId((prev) => prev || 'orig');
     }
 
     if (extractedSubs && extractedSubs.length > 0) {
@@ -299,22 +355,24 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
     setActiveVideoUrl(ep.videoUrl);
     setActiveTitle(`${currentMedia.title} - S${ep.seasonNumber}:E${ep.episodeNumber}`);
     setPlayerSelectedSeason(ep.seasonNumber);
-    setCurrentMedia((prev) => ({
-      ...prev,
-      videoUrl: ep.videoUrl,
-      audioTracks: [
-        {
-          id: 'orig',
-          language: 'Original',
-          label: 'Original Audio',
-          channels: 'Embedded Multi-Track',
-          codec: 'AAC/AC3',
-          videoUrl: ep.videoUrl,
-          isOriginal: true,
-          isDefault: true,
-        },
-      ],
-    }));
+    setCurrentMedia((prev) => {
+      const origTrack: AudioTrack = {
+        id: 'orig',
+        language: 'Original',
+        label: 'Original Audio',
+        channels: 'Stereo / 5.1',
+        codec: 'AAC/AC3',
+        videoUrl: ep.videoUrl,
+        isOriginal: true,
+        isDefault: true,
+      };
+      const otherTracks = prev.audioTracks.filter((t) => !t.isOriginal && t.id !== 'orig');
+      return {
+        ...prev,
+        videoUrl: ep.videoUrl,
+        audioTracks: [origTrack, ...otherTracks],
+      };
+    });
     setActiveAudioTrackId('orig');
   };
 

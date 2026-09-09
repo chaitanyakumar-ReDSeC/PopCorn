@@ -111,7 +111,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const speeds: PlaybackSpeed[] = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-  const effectiveVideoUrl = activeAudioTrack?.videoUrl || src;
+  const isOriginalAudio =
+    !activeAudioTrack ||
+    activeAudioTrack.isOriginal ||
+    activeAudioTrack.isDefault ||
+    activeAudioTrack.id === 'orig' ||
+    activeAudioTrack.id === 'default';
+
+  // If user is playing original/default audio track, ALWAYS play directly from the default video track URL (src)
+  const effectiveVideoUrl =
+    !isOriginalAudio && activeAudioTrack?.videoUrl
+      ? activeAudioTrack.videoUrl
+      : src;
 
   // Lifecycle Cleanup on unmount and global stop event
   useEffect(() => {
@@ -205,14 +216,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   useEffect(() => {
     if (videoRef.current) {
       if (!activeAudioTrack?.src) {
-        videoRef.current.volume = isMuted ? 0 : volume;
+        videoRef.current.volume = isMuted ? 0 : (volume > 0 ? volume : 1);
         videoRef.current.muted = isMuted;
       } else {
         videoRef.current.muted = true;
       }
     }
     if (externalAudioRef.current) {
-      externalAudioRef.current.volume = isMuted ? 0 : volume;
+      externalAudioRef.current.volume = isMuted ? 0 : (volume > 0 ? volume : 1);
       externalAudioRef.current.muted = isMuted;
     }
   }, [volume, isMuted, activeAudioTrack]);
@@ -230,7 +241,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       extAudio.src = activeAudioTrack.src;
       extAudio.currentTime = video.currentTime;
       extAudio.playbackRate = playbackSpeed;
-      extAudio.volume = isMuted ? 0 : volume;
+      extAudio.volume = isMuted ? 0 : (volume > 0 ? volume : 1);
       extAudio.muted = isMuted;
 
       // Mute video native track so they don't clash
@@ -247,11 +258,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         });
       }
     } else {
+      // Switching back to default / embedded / original audio:
+      // 1. Completely stop, unload, and release external audio
       if (externalAudioRef.current) {
-        externalAudioRef.current.pause();
+        try {
+          externalAudioRef.current.pause();
+          externalAudioRef.current.currentTime = 0;
+          externalAudioRef.current.removeAttribute('src');
+          externalAudioRef.current.load();
+        } catch {}
+        externalAudioRef.current = null;
       }
+
+      // 2. Unmute and restore video volume from the default video track URL
       video.muted = isMuted;
-      video.volume = isMuted ? 0 : volume;
+      video.volume = isMuted ? 0 : (volume > 0 ? volume : 1);
+
+      // 3. If video is currently active, ensure audio stream resumes
+      if (!video.paused && !isMuted) {
+        video.play().catch(() => {});
+      }
     }
   }, [activeAudioTrack, src]);
 
@@ -262,16 +288,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    const isOriginal =
+      activeAudioTrack.isOriginal ||
+      activeAudioTrack.isDefault ||
+      activeAudioTrack.id === 'orig' ||
+      activeAudioTrack.id === 'default';
+
     // Switch native HTML5 audioTrack if browser supports it
     const nativeAudioTracks = (video as any).audioTracks;
     if (nativeAudioTracks && nativeAudioTracks.length > 0) {
+      let matchedIndex = -1;
       for (let i = 0; i < nativeAudioTracks.length; i++) {
         const trk = nativeAudioTracks[i];
         const isMatch =
           trk.id === activeAudioTrack.id ||
-          trk.language === activeAudioTrack.language ||
-          trk.label === activeAudioTrack.label;
-        trk.enabled = isMatch;
+          (trk.language && activeAudioTrack.language && trk.language.toLowerCase() === activeAudioTrack.language.toLowerCase()) ||
+          (trk.label && activeAudioTrack.label && trk.label.toLowerCase() === activeAudioTrack.label.toLowerCase());
+        if (isMatch) {
+          matchedIndex = i;
+          break;
+        }
+      }
+
+      for (let i = 0; i < nativeAudioTracks.length; i++) {
+        const trk = nativeAudioTracks[i];
+        if (matchedIndex >= 0) {
+          trk.enabled = (i === matchedIndex);
+        } else if (isOriginal) {
+          // When switched back to original audio, enable the primary native track (index 0)
+          trk.enabled = (i === 0);
+        } else if (!activeAudioTrack.src) {
+          // Embedded track with no name match, fallback to track 0
+          trk.enabled = (i === 0);
+        } else {
+          // Standalone external audio is playing, disable native tracks
+          trk.enabled = false;
+        }
       }
     }
 
@@ -282,10 +334,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [activeAudioTrack]);
 
   // Subtitle Loader & WebVTT Generator with CORS Proxy Fallback & Blob URLs
+  // Loads subtitle once per activeSubtitleTrack and keeps it in vttTrackUrl
   useEffect(() => {
-    if (!subtitlesEnabled || !activeSubtitleTrack) {
+    if (!activeSubtitleTrack || !activeSubtitleTrack.src) {
       setVttTrackUrl((prev) => {
-        revokeVttBlobUrl(prev);
+        if (prev) revokeVttBlobUrl(prev);
         return null;
       });
       return;
@@ -295,45 +348,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const loadSubtitles = async () => {
       const srcUrl = activeSubtitleTrack.src;
-      if (!srcUrl) {
-        if (!isCancelled) {
-          setVttTrackUrl((prev) => {
-            revokeVttBlobUrl(prev);
-            return null;
-          });
-        }
-        return;
-      }
-
       try {
         const { blobUrl, error } = await loadSubtitleAsBlobUrl(srcUrl);
         if (isCancelled) {
-          revokeVttBlobUrl(blobUrl);
+          if (blobUrl) revokeVttBlobUrl(blobUrl);
           return;
         }
 
         if (blobUrl) {
           setVttTrackUrl((prev) => {
-            revokeVttBlobUrl(prev);
+            if (prev && prev !== blobUrl) {
+              revokeVttBlobUrl(prev);
+            }
             return blobUrl;
           });
         } else {
           if (error) {
             console.warn('[VideoPlayer] Subtitle fallback warning:', error);
           }
-          setVttTrackUrl((prev) => {
-            revokeVttBlobUrl(prev);
-            return null;
-          });
         }
       } catch (err) {
         console.warn('[VideoPlayer] Subtitle load failed gracefully:', err);
-        if (!isCancelled) {
-          setVttTrackUrl((prev) => {
-            revokeVttBlobUrl(prev);
-            return null;
-          });
-        }
       }
     };
 
@@ -342,7 +377,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [subtitlesEnabled, activeSubtitleTrack?.id, activeSubtitleTrack?.src]);
+  }, [activeSubtitleTrack?.id, activeSubtitleTrack?.src]);
 
   // Clean up blob URL on player unmount
   useEffect(() => {
@@ -351,14 +386,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [vttTrackUrl]);
 
-  // Native Track Mode Syncing
+  // Native Track Mode Syncing: instant on/off subtitle visibility toggle on the fly during playback
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !video.textTracks) return;
+    if (!video) return;
 
-    for (let i = 0; i < video.textTracks.length; i++) {
-      const track = video.textTracks[i];
-      track.mode = subtitlesEnabled ? 'showing' : 'hidden';
+    const updateTextTracksMode = () => {
+      if (video.textTracks && video.textTracks.length > 0) {
+        for (let i = 0; i < video.textTracks.length; i++) {
+          const track = video.textTracks[i];
+          track.mode = subtitlesEnabled ? 'showing' : 'hidden';
+        }
+      }
+    };
+
+    updateTextTracksMode();
+
+    if (video.textTracks) {
+      video.textTracks.addEventListener?.('addtrack', updateTextTracksMode);
+      return () => {
+        video.textTracks?.removeEventListener?.('addtrack', updateTextTracksMode);
+      };
     }
   }, [subtitlesEnabled, vttTrackUrl]);
 
@@ -631,14 +679,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           onWaiting={() => setIsBuffering(true)}
           onError={handleError}
         >
-          {subtitlesEnabled && vttTrackUrl && (
+          {vttTrackUrl && (
             <track
               key={`${activeSubtitleTrack?.id || 'sub'}-${vttTrackUrl}`}
               kind="subtitles"
               src={vttTrackUrl}
               srcLang="en"
               label={activeSubtitleTrack?.label || activeSubtitleTrack?.language || 'Subtitles'}
-              default
+              default={subtitlesEnabled}
               onLoad={(e) => {
                 const trackElem = e.currentTarget as HTMLTrackElement;
                 if (trackElem && trackElem.track) {
