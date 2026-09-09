@@ -10,6 +10,15 @@ interface HomePageProps {
   onNavigateTab: (tab: 'movies' | 'series' | 'private_screen') => void;
 }
 
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export const HomePage: React.FC<HomePageProps> = ({
   movies,
   series,
@@ -23,9 +32,39 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [isMovieHovered, setIsMovieHovered] = useState(false);
   const [isSeriesHovered, setIsSeriesHovered] = useState(false);
 
-  // Take up to 10 items for each carousel section
-  const topMovies = movies.slice(0, 10);
-  const topSeries = series.slice(0, 10);
+  // Randomize entries on initial load or when catalog items change
+  const [randomMovies, setRandomMovies] = useState<MediaItem[]>([]);
+  const [randomSeries, setRandomSeries] = useState<MediaItem[]>([]);
+
+  useEffect(() => {
+    if (movies.length === 0) {
+      setRandomMovies([]);
+      return;
+    }
+    setRandomMovies((prev) => {
+      const prevIds = prev.map((m) => m.id).sort().join(',');
+      const currentIds = movies.map((m) => m.id).sort().join(',');
+      if (prevIds === currentIds && prev.length > 0) {
+        return prev;
+      }
+      return shuffleArray(movies);
+    });
+  }, [movies]);
+
+  useEffect(() => {
+    if (series.length === 0) {
+      setRandomSeries([]);
+      return;
+    }
+    setRandomSeries((prev) => {
+      const prevIds = prev.map((s) => s.id).sort().join(',');
+      const currentIds = series.map((s) => s.id).sort().join(',');
+      if (prevIds === currentIds && prev.length > 0) {
+        return prev;
+      }
+      return shuffleArray(series);
+    });
+  }, [series]);
 
   // Continuous auto-scrolling walk-around right effect
   useEffect(() => {
@@ -41,7 +80,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       }
     }, 3500);
     return () => clearInterval(interval);
-  }, [isMovieHovered, topMovies.length]);
+  }, [isMovieHovered, randomMovies.length]);
 
   useEffect(() => {
     if (isSeriesHovered) return;
@@ -56,7 +95,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       }
     }, 4000);
     return () => clearInterval(interval);
-  }, [isSeriesHovered, topSeries.length]);
+  }, [isSeriesHovered, randomSeries.length]);
 
   const scrollContainer = (ref: React.RefObject<HTMLDivElement | null>, direction: 'left' | 'right') => {
     if (ref.current) {
@@ -117,7 +156,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {/* Horizontal Carousel Row */}
-        {topMovies.length === 0 ? (
+        {randomMovies.length === 0 ? (
           <div className="bg-neutral-900 border border-white/5 rounded-2xl p-8 text-center text-neutral-400">
             <p className="text-sm font-bold text-white">No Movies Found</p>
             <p className="text-xs text-neutral-500 mt-1">Coming soon.</p>
@@ -130,7 +169,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             className="flex items-stretch gap-4 overflow-x-auto scrollbar-none scroll-smooth pb-4 pt-1"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {topMovies.map((movie) => (
+            {randomMovies.map((movie) => (
               <div
                 key={movie.id}
                 onClick={() => onPlayMovie(movie)}
@@ -183,6 +222,36 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </div>
             ))}
+
+            {/* "See all" Movies Card */}
+            <div
+              onClick={() => onNavigateTab('movies')}
+              className="group flex-shrink-0 w-44 sm:w-52 bg-gradient-to-b from-neutral-900/90 to-neutral-950 rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all duration-300 shadow-xl flex flex-col justify-between cursor-pointer"
+            >
+              <div className="relative aspect-[2/3] overflow-hidden bg-neutral-950 flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-600/15 border border-red-600/40 group-hover:border-red-600 group-hover:bg-red-600 text-red-500 group-hover:text-white flex items-center justify-center shadow-lg transition-all duration-300 transform group-hover:scale-110 mb-3">
+                  <ArrowRight className="w-6 h-6 transform group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="font-extrabold text-base text-white group-hover:text-red-500 transition">
+                  See all
+                </span>
+                <span className="text-[11px] text-neutral-400 mt-1">
+                  Explore all {movies.length} movies
+                </span>
+              </div>
+              <div className="p-3.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateTab('movies');
+                  }}
+                  className="w-full py-1.5 px-3 rounded-lg bg-neutral-800 group-hover:bg-red-600 text-neutral-300 group-hover:text-white font-bold text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-md"
+                >
+                  <span>Browse Catalog</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -234,7 +303,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         {/* Horizontal Series Carousel Row */}
-        {topSeries.length === 0 ? (
+        {randomSeries.length === 0 ? (
           <div className="bg-neutral-900 border border-white/5 rounded-2xl p-8 text-center text-neutral-400">
             <p className="text-sm font-bold text-white">No Series Found</p>
             <p className="text-xs text-neutral-500 mt-1">Coming soon.</p>
@@ -247,7 +316,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             className="flex items-stretch gap-4 overflow-x-auto scrollbar-none scroll-smooth pb-4 pt-1"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {topSeries.map((sItem) => (
+            {randomSeries.map((sItem) => (
               <div
                 key={sItem.id}
                 onClick={() => onPlaySeries(sItem)}
@@ -307,6 +376,36 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </div>
               </div>
             ))}
+
+            {/* "See all" Series Card */}
+            <div
+              onClick={() => onNavigateTab('series')}
+              className="group flex-shrink-0 w-44 sm:w-52 bg-gradient-to-b from-neutral-900/90 to-neutral-950 rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all duration-300 shadow-xl flex flex-col justify-between cursor-pointer"
+            >
+              <div className="relative aspect-[2/3] overflow-hidden bg-neutral-950 flex flex-col items-center justify-center p-4 text-center">
+                <div className="w-14 h-14 rounded-full bg-red-600/15 border border-red-600/40 group-hover:border-red-600 group-hover:bg-red-600 text-red-500 group-hover:text-white flex items-center justify-center shadow-lg transition-all duration-300 transform group-hover:scale-110 mb-3">
+                  <ArrowRight className="w-6 h-6 transform group-hover:translate-x-0.5 transition-transform" />
+                </div>
+                <span className="font-extrabold text-base text-white group-hover:text-red-500 transition">
+                  See all
+                </span>
+                <span className="text-[11px] text-neutral-400 mt-1">
+                  Explore all {series.length} series
+                </span>
+              </div>
+              <div className="p-3.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateTab('series');
+                  }}
+                  className="w-full py-1.5 px-3 rounded-lg bg-neutral-800 group-hover:bg-red-600 text-neutral-300 group-hover:text-white font-bold text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-md"
+                >
+                  <span>Browse Catalog</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </section>

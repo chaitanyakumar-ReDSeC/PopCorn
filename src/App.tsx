@@ -31,7 +31,11 @@ const DEFAULT_EMPTY_MEDIA: MediaItem = {
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('home');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Separate search bars for Home, Movies, and Series
+  const [homeSearchQuery, setHomeSearchQuery] = useState('');
+  const [moviesSearchQuery, setMoviesSearchQuery] = useState('');
+  const [seriesSearchQuery, setSeriesSearchQuery] = useState('');
+
   const [selectedMedia, setSelectedMedia] = useState<MediaItem>(DEFAULT_EMPTY_MEDIA);
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
 
@@ -87,10 +91,20 @@ export default function App() {
           setViewMode(mode);
         }}
         onOpenPrivateScreenModal={() => setIsPrivateModalOpen(true)}
-        searchQuery={searchQuery}
-        onSearchChange={(q) => setSearchQuery(q)}
+        homeSearchQuery={homeSearchQuery}
+        onHomeSearchChange={setHomeSearchQuery}
+        moviesSearchQuery={moviesSearchQuery}
+        onMoviesSearchChange={setMoviesSearchQuery}
+        seriesSearchQuery={seriesSearchQuery}
+        onSeriesSearchChange={setSeriesSearchQuery}
         moviesCount={moviesList.length}
         seriesCount={seriesList.length}
+        movies={moviesList}
+        series={seriesList}
+        onPlayMovie={(movie) => handleLaunchPrivateScreen(movie)}
+        onPlaySeries={(seriesItem, videoUrl, title) =>
+          handleLaunchPrivateScreen(seriesItem, videoUrl, title)
+        }
       />
 
       {/* Global Private Screen Pop-up Options Modal */}
@@ -119,7 +133,7 @@ export default function App() {
             <MovieGrid
               movies={moviesList}
               onPlayMovie={(movie) => handleLaunchPrivateScreen(movie)}
-              searchQuery={searchQuery}
+              searchQuery={moviesSearchQuery}
             />
           </div>
         )}
@@ -131,7 +145,7 @@ export default function App() {
               onPlaySeries={(seriesItem, videoUrl, title) =>
                 handleLaunchPrivateScreen(seriesItem, videoUrl, title)
               }
-              searchQuery={searchQuery}
+              searchQuery={seriesSearchQuery}
             />
           </div>
         )}

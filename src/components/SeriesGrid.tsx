@@ -12,7 +12,19 @@ interface SeriesGridProps {
 export const SeriesGrid: React.FC<SeriesGridProps> = ({ onPlaySeries, searchQuery, series }) => {
   const seriesList = series && series.length > 0 ? series : SERIES_DATA;
 
-  const filteredSeries = seriesList.filter((s) => {
+  // Sort series in ascending order by year from csv field
+  const sortedSeries = React.useMemo(() => {
+    return [...seriesList].sort((a, b) => {
+      const yearA = typeof a.year === 'number' ? a.year : parseInt(String(a.year || '0'), 10) || 0;
+      const yearB = typeof b.year === 'number' ? b.year : parseInt(String(b.year || '0'), 10) || 0;
+      if (yearA !== yearB) {
+        return yearA - yearB;
+      }
+      return (a.title || '').localeCompare(b.title || '');
+    });
+  }, [seriesList]);
+
+  const filteredSeries = sortedSeries.filter((s) => {
     return (
       !searchQuery ||
       s.title.toLowerCase().includes(searchQuery.toLowerCase())
