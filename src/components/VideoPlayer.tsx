@@ -124,7 +124,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       ? activeAudioTrack.videoUrl
       : src;
 
-  // Lifecycle Cleanup on unmount and global stop event
+  // Track previous media/episode so we reset timeline when switching episodes/media
+  const prevBaseSrcRef = useRef<string>(src);
+  const prevTitleRef = useRef<string>(title);
+
+  // Lifecycle Cleanup on unmount and global stop / restart events
   useEffect(() => {
     const handleStopGlobal = () => {
       if (externalAudioRef.current) {
@@ -143,10 +147,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onPlaybackStateChange?.(false);
     };
 
+    const handleRestartGlobal = () => {
+      if (videoRef.current) {
+        try {
+          videoRef.current.currentTime = 0;
+        } catch {}
+        setCurrentTime(0);
+        videoRef.current.play().catch(() => {});
+      }
+      if (externalAudioRef.current) {
+        try {
+          externalAudioRef.current.currentTime = 0;
+          externalAudioRef.current.play().catch(() => {});
+        } catch {}
+      }
+    };
+
     window.addEventListener('popcorn:stop-playback', handleStopGlobal);
+    window.addEventListener('popcorn:restart-playback', handleRestartGlobal);
 
     return () => {
       window.removeEventListener('popcorn:stop-playback', handleStopGlobal);
+      window.removeEventListener('popcorn:restart-playback', handleRestartGlobal);
       handleStopGlobal();
     };
   }, []);
@@ -156,11 +178,38 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video || !effectiveVideoUrl) return;
 
-    const previousTime = video.currentTime || 0;
-    const wasPlaying = !video.paused;
+    // Detect if the underlying media or episode has changed (different base src or different title)
+    const isNewMediaOrEpisode =
+      src !== prevBaseSrcRef.current || title !== prevTitleRef.current;
+
+    // Only restore previousTime if we are on the exact same media/episode (e.g. switching audio track stream)
+    const previousTime = isNewMediaOrEpisode ? 0 : (video.currentTime || 0);
+    const wasPlaying = isNewMediaOrEpisode ? true : !video.paused;
+
+    // Update refs to track current content
+    prevBaseSrcRef.current = src;
+    prevTitleRef.current = title;
 
     setPlaybackError(null);
     setIsBuffering(true);
+
+    // If switching to another episode or media, immediately reset playback timeline to start
+    if (isNewMediaOrEpisode) {
+      setCurrentTime(0);
+      setDuration(0);
+      try {
+        video.currentTime = 0;
+      } catch {}
+      if (externalAudioRef.current) {
+        try {
+          externalAudioRef.current.pause();
+          externalAudioRef.current.currentTime = 0;
+          externalAudioRef.current.removeAttribute('src');
+          externalAudioRef.current.load();
+        } catch {}
+        externalAudioRef.current = null;
+      }
+    }
 
     // Reset video volume and un-mute
     video.volume = isMuted ? 0 : volume;
@@ -170,7 +219,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     video.load();
 
     const handleLoadedMetadata = () => {
-      if (previousTime > 0 && previousTime < video.duration) {
+      if (isNewMediaOrEpisode) {
+        try {
+          video.currentTime = 0;
+        } catch {}
+        setCurrentTime(0);
+      } else if (previousTime > 0 && previousTime < video.duration) {
         video.currentTime = previousTime;
       }
       if (wasPlaying) {
@@ -200,7 +254,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         externalAudioRef.current.pause();
       }
     };
-  }, [effectiveVideoUrl]);
+  }, [effectiveVideoUrl, src, title]);
 
   // Update speed when playbackSpeed changes
   useEffect(() => {

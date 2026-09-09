@@ -352,6 +352,12 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
   }, [currentEpisode?.seasonNumber]);
 
   const handleSwitchEpisode = (ep: Episode) => {
+    // If user clicks the currently active episode, rewind to 0:00 and restart playback
+    if (ep.videoUrl === activeVideoUrl) {
+      window.dispatchEvent(new CustomEvent('popcorn:restart-playback'));
+      return;
+    }
+
     setActiveVideoUrl(ep.videoUrl);
     setActiveTitle(`${currentMedia.title} - S${ep.seasonNumber}:E${ep.episodeNumber}`);
     setPlayerSelectedSeason(ep.seasonNumber);
