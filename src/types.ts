@@ -21,6 +21,7 @@ export interface AudioTrack {
   videoUrl?: string;
   isDefault?: boolean;
   isOriginal?: boolean;
+  nativeTrackIndex?: number;
 }
 
 export interface SubtitleTrack {

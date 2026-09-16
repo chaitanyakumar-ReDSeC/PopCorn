@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { PlaybackSpeed, AudioTrack, SubtitleTrack } from '../types';
+import { formatLanguageName } from '../utils/mediaTrackDetector';
 import {
   loadSubtitleAsBlobUrl,
   revokeVttBlobUrl,
@@ -234,6 +235,39 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
 
+    const audioTracksList = (video as any).audioTracks;
+    const syncNativeAudioTracks = () => {
+      if (audioTracksList && audioTracksList.length > 0) {
+        const extracted: AudioTrack[] = [];
+        for (let i = 0; i < audioTracksList.length; i++) {
+          const trk = audioTracksList[i];
+          const langName = formatLanguageName(
+            trk.language || trk.label,
+            i === 0 ? 'Original Audio' : `Audio Track ${i + 1}`
+          );
+          extracted.push({
+            id: trk.id || `aud-native-${i}`,
+            language: langName,
+            label: trk.label || `${langName} (Track ${i + 1})`,
+            channels: trk.channels || (i === 0 ? '5.1 Surround' : 'Stereo (2.0)'),
+            codec: 'AAC/AC3',
+            isOriginal: i === 0,
+            isDefault: i === 0,
+            nativeTrackIndex: i,
+          });
+        }
+        if (extracted.length > 0) {
+          onTracksExtracted?.(extracted, undefined);
+        }
+      }
+    };
+
+    if (audioTracksList) {
+      audioTracksList.addEventListener?.('addtrack', syncNativeAudioTracks);
+      audioTracksList.addEventListener?.('removetrack', syncNativeAudioTracks);
+      audioTracksList.addEventListener?.('change', syncNativeAudioTracks);
+    }
+
     const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise
@@ -250,6 +284,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     return () => {
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      if (audioTracksList) {
+        audioTracksList.removeEventListener?.('addtrack', syncNativeAudioTracks);
+        audioTracksList.removeEventListener?.('removetrack', syncNativeAudioTracks);
+        audioTracksList.removeEventListener?.('change', syncNativeAudioTracks);
+      }
       if (externalAudioRef.current) {
         externalAudioRef.current.pause();
       }
@@ -352,15 +391,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const nativeAudioTracks = (video as any).audioTracks;
     if (nativeAudioTracks && nativeAudioTracks.length > 0) {
       let matchedIndex = -1;
-      for (let i = 0; i < nativeAudioTracks.length; i++) {
-        const trk = nativeAudioTracks[i];
-        const isMatch =
-          trk.id === activeAudioTrack.id ||
-          (trk.language && activeAudioTrack.language && trk.language.toLowerCase() === activeAudioTrack.language.toLowerCase()) ||
-          (trk.label && activeAudioTrack.label && trk.label.toLowerCase() === activeAudioTrack.label.toLowerCase());
-        if (isMatch) {
-          matchedIndex = i;
-          break;
+      if (
+        activeAudioTrack.nativeTrackIndex !== undefined &&
+        activeAudioTrack.nativeTrackIndex >= 0 &&
+        activeAudioTrack.nativeTrackIndex < nativeAudioTracks.length
+      ) {
+        matchedIndex = activeAudioTrack.nativeTrackIndex;
+      } else {
+        for (let i = 0; i < nativeAudioTracks.length; i++) {
+          const trk = nativeAudioTracks[i];
+          const isMatch =
+            trk.id === activeAudioTrack.id ||
+            (trk.language && activeAudioTrack.language && trk.language.toLowerCase() === activeAudioTrack.language.toLowerCase()) ||
+            (trk.label && activeAudioTrack.label && trk.label.toLowerCase() === activeAudioTrack.label.toLowerCase());
+          if (isMatch) {
+            matchedIndex = i;
+            break;
+          }
         }
       }
 
@@ -623,12 +670,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (audioTracksList && audioTracksList.length > 0) {
       for (let i = 0; i < audioTracksList.length; i++) {
         const trk = audioTracksList[i];
+        const langName = formatLanguageName(
+          trk.language || trk.label,
+          i === 0 ? 'Original Audio' : `Audio Track ${i + 1}`
+        );
         extractedAudio.push({
-          id: trk.id || `aud-${i}`,
-          language: trk.language || trk.label || `Track ${i + 1}`,
-          label: trk.label || `Audio Track ${i + 1}`,
-          channels: trk.channels || 'Multi-Channel',
+          id: trk.id || `aud-native-${i}`,
+          language: langName,
+          label: trk.label || `${langName} (Track ${i + 1})`,
+          channels: trk.channels || (i === 0 ? '5.1 Surround' : 'Stereo (2.0)'),
           codec: 'AAC/AC3',
+          isOriginal: i === 0,
+          isDefault: i === 0,
+          nativeTrackIndex: i,
         });
       }
     }

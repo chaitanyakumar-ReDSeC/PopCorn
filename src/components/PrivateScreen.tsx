@@ -260,30 +260,36 @@ export const PrivateScreen: React.FC<PrivateScreenProps> = ({
   ) => {
     if (extractedAudio && extractedAudio.length > 0) {
       setCurrentMedia((prev) => {
-        // If current media already has multiple audio tracks defined, preserve them
-        if (prev.audioTracks.length > 1) return prev;
+        const isLocal = prev.id.startsWith('local-') || prev.genres?.includes('Local Media');
 
-        const origTrack = prev.audioTracks[0] || {
-          id: 'orig',
-          language: 'Original',
-          label: 'Original Audio',
-          channels: 'Stereo / 5.1',
-          codec: 'AAC/AC3',
+        // If it's a catalog movie with pre-configured multi-tracks from CSV, preserve them
+        if (!isLocal && prev.audioTracks.length > 1) return prev;
+
+        // If local media already has more detected audio tracks from container analysis than extractedAudio, keep them
+        const existingEmbedded = prev.audioTracks.filter((t) => !t.src);
+        if (isLocal && existingEmbedded.length > extractedAudio.length) {
+          return prev;
+        }
+
+        // Keep any custom external audio tracks with src that the user attached
+        const externalTracks = prev.audioTracks.filter((t) => Boolean(t.src));
+
+        const origTrack = {
+          ...extractedAudio[0],
           videoUrl: activeVideoUrl,
           isOriginal: true,
           isDefault: true,
         };
 
-        const extraTracks = extractedAudio.filter(
-          (ea) => ea.id !== origTrack.id && ea.label !== origTrack.label
-        );
+        const extraTracks = extractedAudio.slice(1);
+        const mergedAudio = [origTrack, ...extraTracks, ...externalTracks];
 
         return {
           ...prev,
-          audioTracks: [origTrack, ...extraTracks],
+          audioTracks: mergedAudio,
         };
       });
-      setActiveAudioTrackId((prev) => prev || 'orig');
+      setActiveAudioTrackId((prev) => prev || extractedAudio[0]?.id || 'orig');
     }
 
     if (extractedSubs && extractedSubs.length > 0) {
